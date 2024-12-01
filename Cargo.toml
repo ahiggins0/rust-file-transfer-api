@@ -1,0 +1,10 @@
+[package]
+name = "rust-file-transfer-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7.9"
+tokio = { version = "1.4.11", features = ["full"] }
+tokio-util = { version = "0.7.12", features = ["full"] }
+serde = { version = "1.0.215", features = ["derive"] }

@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  axum-server:
+    build: .
+    environment:
+      - FILE_DIR=/mnt/test
+    ports:
+      - "3000:3000"
+    volumes:
+      - C:/Temp:/mnt/test
