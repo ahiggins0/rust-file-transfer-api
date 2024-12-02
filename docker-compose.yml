@@ -5,6 +5,8 @@ services:
     build: .
     environment:
       - FILE_DIR=/mnt/test
+      - BASIC_AUTH_USER=example-user
+      - BASIC_AUTH_PASSWORD=example-password
     ports:
       - "3000:3000"
     volumes:
