@@ -8,3 +8,4 @@ axum = "0.7.9"
 tokio = { version = "1.4.11", features = ["full"] }
 tokio-util = { version = "0.7.12", features = ["full"] }
 serde = { version = "1.0.215", features = ["derive"] }
+base64 = "0.22.1"
