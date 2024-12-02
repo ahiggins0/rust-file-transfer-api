@@ -23,7 +23,7 @@ async fn main() {
     let app = Router::new()
         // `GET /` goes to `root`
         .route("/", get(root))
-        // `GET /list-dir` goes to `list_dir`
+        // `GET /list` goes to `list_dir`
         .route("/list", get(list_dir))
         .route("/download/:file_path", get(download_file))
         .layer(middleware::from_fn(auth::auth_middleware));
