@@ -2,16 +2,20 @@ use axum::{
     extract::Path,
     response::{IntoResponse, Response},
     routing::{get},
-    http::{header, StatusCode},
+    http::{header, StatusCode, Request},
     Json, Router,
     body::Body,
+    middleware::{self, Next},
 };
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{PathBuf};
+use std::net::SocketAddr;
 use std::env;
+
+mod auth;
 
 #[tokio::main]
 async fn main() {
@@ -20,8 +24,9 @@ async fn main() {
         // `GET /` goes to `root`
         .route("/", get(root))
         // `GET /list-dir` goes to `list_dir`
-        .route("/list-dir", get(list_dir))
-        .route("/download/:file_path", get(download_file));
+        .route("/list", get(list_dir))
+        .route("/download/:file_path", get(download_file))
+        .layer(middleware::from_fn(auth::auth_middleware));
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -34,7 +39,7 @@ async fn root() -> &'static str {
 }
 
 // handler to list the contents of a directory
-async fn list_dir() -> Result<Json<Vec<String>>, StatusCode> {
+async fn list_dir() -> Result<Json<Vec<(String, String)>>, StatusCode> {
     // Change this path to the directory you want to list
     let base_path = env::var("FILE_DIR").expect("FILE_DIR environment variable must be set");
     let path = PathBuf::from(base_path);
@@ -43,8 +48,19 @@ async fn list_dir() -> Result<Json<Vec<String>>, StatusCode> {
         let entries = fs::read_dir(path)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .filter_map(|entry| entry.ok()) // filter out errors
-            .filter_map(|entry| entry.path().to_str().map(String::from)) // convert paths to Strings
-            .collect::<Vec<String>>();
+            .filter_map(|entry| {
+                let file_name = entry.file_name().to_str().map(String::from);
+                let metadata = entry.metadata().ok();
+                
+                // If both the file name and metadata (to get the size) are available, return them
+                file_name.and_then(|name| metadata.map(|meta| {
+                    // Convert bytes to GB (divide by 1,073,741,824 bytes per GB)
+                    let size_in_gb = meta.len() as f64 / 1_073_741_824.0;
+                    // Return the file name and size in GB, rounded to 2 decimal places
+                    (name, format!("{:.2} GB", size_in_gb))
+                }))
+            }) // convert paths to Strings
+            .collect::<Vec<(String, String)>>();
         
         Ok(Json(entries))
     } else {
