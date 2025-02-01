@@ -1,6 +1,6 @@
 use axum::{
     extract::Path,
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Response, Html},
     routing::{get},
     http::{header, StatusCode, Request},
     Json, Router,
@@ -39,30 +39,45 @@ async fn root() -> &'static str {
 }
 
 // handler to list the contents of a directory
-async fn list_dir() -> Result<Json<Vec<(String, String)>>, StatusCode> {
-    // Change this path to the directory you want to list
+async fn list_dir() -> Result<Html<String>, StatusCode> {
     let base_path = env::var("FILE_DIR").expect("FILE_DIR environment variable must be set");
-    let path = PathBuf::from(base_path);
+    let path = PathBuf::from(&base_path);
 
     if path.is_dir() {
         let entries = fs::read_dir(path)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .filter_map(|entry| entry.ok()) // filter out errors
+            .filter_map(|entry| entry.ok())
             .filter_map(|entry| {
                 let file_name = entry.file_name().to_str().map(String::from);
                 let metadata = entry.metadata().ok();
                 
-                // If both the file name and metadata (to get the size) are available, return them
                 file_name.and_then(|name| metadata.map(|meta| {
-                    // Convert bytes to GB (divide by 1,073,741,824 bytes per GB)
                     let size_in_gb = meta.len() as f64 / 1_073_741_824.0;
-                    // Return the file name and size in GB, rounded to 2 decimal places
-                    (name, format!("{:.2} GB", size_in_gb))
+                    let download_url = format!("/download/{}", name);
+                    (name, format!("{:.2} GB", size_in_gb), download_url)
                 }))
-            }) // convert paths to Strings
-            .collect::<Vec<(String, String)>>();
-        
-        Ok(Json(entries))
+            })
+            .collect::<Vec<(String, String, String)>>();
+
+        let html_content = format!(
+            "<html>
+                <head>
+                    <title>File List</title>
+                </head>
+                <body>
+                    <h1>Available Files</h1>
+                    <ul>
+                        {}
+                    </ul>
+                </body>
+            </html>",
+            entries.iter()
+                .map(|(name, size, url)| format!("<li><a href=\"{}\">{}</a> ({})</li>", url, name, size))
+                .collect::<Vec<String>>()
+                .join("")
+        );
+
+        Ok(Html(html_content))
     } else {
         Err(StatusCode::BAD_REQUEST)
     }
